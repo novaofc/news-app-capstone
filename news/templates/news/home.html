@@ -1,0 +1,33 @@
+{% extends "news/base.html" %}
+{% block content %}
+<div class="layout">
+  <section>
+    <form class="search" method="get" role="search">
+      <input type="search" name="q" value="{{ query }}" placeholder="Search articles" aria-label="Search articles">
+      <button class="button" type="submit">Search</button>
+    </form>
+    {% if query %}<p class="meta">Results for “{{ query }}”</p>{% endif %}
+    {% for article in page_obj %}
+      {% include "news/_story.html" with article=article lead=forloop.first %}
+    {% empty %}
+      <p class="empty">No published articles yet.</p>
+    {% endfor %}
+    {% include "news/_pagination.html" %}
+  </section>
+  <aside class="sidebar">
+    <h2>Publishers</h2>
+    {% for publisher in publishers %}
+      <p><a href="{{ publisher.get_absolute_url }}">{{ publisher.name }}</a>
+        <span class="meta">· {{ publisher.published }} article{{ publisher.published|pluralize }}</span></p>
+    {% empty %}
+      <p class="muted">No publishers yet.</p>
+    {% endfor %}
+    {% if not user.is_authenticated %}
+      <hr class="section-rule">
+      <h3>Read the full story</h3>
+      <p class="muted">Create a free reader account to read articles, follow journalists and get new stories by email.</p>
+      <a class="button" href="{% url 'news:signup' %}">Join</a>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

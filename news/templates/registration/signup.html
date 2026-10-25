@@ -1,0 +1,11 @@
+{% extends "news/base.html" %}
+{% block title %}Create account · The Daily Ledger{% endblock %}
+{% block content %}
+<h1>Create an account</h1>
+<p class="muted">Join as a reader, journalist or editor.</p>
+<form class="form" method="post" novalidate>
+  {% csrf_token %}
+  {{ form.as_p }}
+  <div class="actions"><button class="button" type="submit">Create account</button></div>
+</form>
+{% endblock %}

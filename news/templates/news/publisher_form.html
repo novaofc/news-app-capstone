@@ -1,0 +1,26 @@
+{% extends "news/base.html" %}
+{% block title %}{{ heading }} · The Daily Ledger{% endblock %}
+{% block content %}
+<h1>{{ heading }}</h1>
+<p class="muted">Editors and journalists listed here appear on the publisher's page. Journalists can only file articles for publishers they belong to.</p>
+<form class="form" method="post" novalidate>
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  <p>{{ form.name.label_tag }} {{ form.name }} {{ form.name.errors }}</p>
+  <p>{{ form.description.label_tag }} {{ form.description }} {{ form.description.errors }}</p>
+  <fieldset class="checkbox-list">
+    <legend><strong>Editors</strong></legend>
+    {{ form.editors }}
+    {{ form.editors.errors }}
+  </fieldset>
+  <fieldset class="checkbox-list">
+    <legend><strong>Journalists</strong></legend>
+    {{ form.journalists }}
+    {{ form.journalists.errors }}
+  </fieldset>
+  <div class="actions">
+    <button class="button" type="submit">Save publisher</button>
+    <a class="button secondary" href="{% if publisher %}{{ publisher.get_absolute_url }}{% else %}{% url 'news:publisher_list' %}{% endif %}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

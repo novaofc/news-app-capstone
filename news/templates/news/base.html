@@ -1,0 +1,74 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}The Daily Ledger{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,700;0,9..144,800;1,9..144,400&family=Instrument+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'news/style.css' %}">
+</head>
+<body>
+  <header class="masthead">
+    <div class="wrap">
+      <div class="masthead-top">
+        <span>{% now "l, j F Y" %}</span>
+        <span>
+          {% if user.is_authenticated %}
+            Signed in as <strong>{{ user.username }}</strong>
+            <span class="role-badge">{{ user.get_role_display }}</span>
+            &nbsp;·&nbsp;
+            <form class="inline-form" method="post" action="{% url 'logout' %}">
+              {% csrf_token %}
+              <button class="link-button" type="submit">Log out</button>
+            </form>
+          {% else %}
+            <a href="{% url 'login' %}">Log in</a> &nbsp;·&nbsp;
+            <a href="{% url 'news:signup' %}">Create account</a>
+          {% endif %}
+        </span>
+      </div>
+      <a class="brand" href="{% url 'news:home' %}">The Daily Ledger</a>
+      <p class="tagline">Independent journalism, curated by editors</p>
+      <nav class="nav" aria-label="Main">
+        <a href="{% url 'news:home' %}">Front page</a>
+        <a href="{% url 'news:publisher_list' %}">Publishers</a>
+        {% if user.is_authenticated %}
+          <a href="{% url 'news:newsletter_list' %}">Newsletters</a>
+          {% if user.is_reader %}
+            <a href="{% url 'news:subscriptions' %}">My subscriptions</a>
+          {% endif %}
+          {% if perms.news.add_article %}
+            <a href="{% url 'news:my_articles' %}">My desk</a>
+            <a href="{% url 'news:article_create' %}">Write</a>
+          {% endif %}
+          {% if perms.news.approve_article %}
+            <a href="{% url 'news:review_queue' %}">Review queue</a>
+          {% endif %}
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="wrap">
+      {% if messages %}
+        <ul class="messages">
+          {% for message in messages %}
+            <li class="{{ message.tags }}">{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      The Daily Ledger · Django capstone project ·
+      API at <a href="/api/">/api/</a>
+    </div>
+  </footer>
+</body>
+</html>

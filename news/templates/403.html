@@ -1,0 +1,7 @@
+{% extends "news/base.html" %}
+{% block title %}Not allowed · The Daily Ledger{% endblock %}
+{% block content %}
+<h1>You don't have access to this page</h1>
+<p>{{ exception|default:"Your role doesn't allow this action." }}</p>
+<p><a class="button" href="{% url 'news:home' %}">Back to the front page</a></p>
+{% endblock %}

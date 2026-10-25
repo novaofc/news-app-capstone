@@ -1,0 +1,19 @@
+{% extends "news/base.html" %}
+{% block title %}Publishers · The Daily Ledger{% endblock %}
+{% block content %}
+<h1>Publishers</h1>
+{% if perms.news.add_publisher %}
+  <div class="actions"><a class="button" href="{% url 'news:publisher_create' %}">New publisher</a></div>
+{% endif %}
+<div class="card-grid">
+  {% for publisher in publishers %}
+    <div class="card">
+      <h3><a href="{{ publisher.get_absolute_url }}">{{ publisher.name }}</a></h3>
+      <p>{{ publisher.description|truncatewords:25 }}</p>
+      <p class="meta">{{ publisher.published }} article{{ publisher.published|pluralize }} · {{ publisher.staff }} journalist{{ publisher.staff|pluralize }}</p>
+    </div>
+  {% empty %}
+    <p class="empty">No publishers yet.</p>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,17 @@
+{% if articles %}
+<table class="ledger">
+  <thead><tr><th>Title</th><th>Publisher</th><th>Written</th><th></th></tr></thead>
+  <tbody>
+  {% for article in articles %}
+    <tr>
+      <td><a href="{{ article.get_absolute_url }}">{{ article.title }}</a></td>
+      <td>{{ article.publisher.name|default:"Independent" }}</td>
+      <td>{{ article.created_at|date:"j M Y" }}</td>
+      <td><a href="{% url 'news:article_update' article.pk %}">Edit</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+  <p class="empty">Nothing here.</p>
+{% endif %}

@@ -1,0 +1,34 @@
+{% extends "news/base.html" %}
+{% block title %}My subscriptions · The Daily Ledger{% endblock %}
+{% block content %}
+<div class="layout">
+  <section>
+    <h1>Your feed</h1>
+    <p class="muted">Published articles from the journalists and publishers you follow. New ones are also emailed to {{ user.email|default:"you (add an email to your account)" }}.</p>
+    {% for article in page_obj %}
+      {% include "news/_story.html" with article=article %}
+    {% empty %}
+      <p class="empty">Nothing yet. Subscribe to a journalist or publisher to fill your feed.</p>
+    {% endfor %}
+    {% include "news/_pagination.html" %}
+  </section>
+  <aside class="sidebar">
+    <h2>Following</h2>
+    {% for publisher in publishers %}
+      {% include "news/_subscription_row.html" with kind="publisher" target=publisher subscribed=True %}
+    {% endfor %}
+    {% for journalist in journalists %}
+      {% include "news/_subscription_row.html" with kind="journalist" target=journalist subscribed=True %}
+    {% endfor %}
+    {% if not publishers and not journalists %}<p class="muted">No subscriptions yet.</p>{% endif %}
+
+    <h2>Discover</h2>
+    {% for publisher in other_publishers %}
+      {% include "news/_subscription_row.html" with kind="publisher" target=publisher subscribed=False %}
+    {% endfor %}
+    {% for journalist in other_journalists %}
+      {% include "news/_subscription_row.html" with kind="journalist" target=journalist subscribed=False %}
+    {% endfor %}
+  </aside>
+</div>
+{% endblock %}

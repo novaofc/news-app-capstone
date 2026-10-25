@@ -1,0 +1,15 @@
+{% extends "news/base.html" %}
+{% block title %}{{ heading }} · The Daily Ledger{% endblock %}
+{% block content %}
+<h1>{{ heading }}</h1>
+<p class="muted">New and edited articles are published once an editor approves them.</p>
+<form class="form" method="post" novalidate>
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  {{ form.as_p }}
+  <div class="actions">
+    <button class="button" type="submit">Save article</button>
+    <a class="button secondary" href="{% if article %}{{ article.get_absolute_url }}{% else %}{% url 'news:my_articles' %}{% endif %}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

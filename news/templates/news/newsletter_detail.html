@@ -1,0 +1,22 @@
+{% extends "news/base.html" %}
+{% block title %}{{ newsletter.title }} · The Daily Ledger{% endblock %}
+{% block content %}
+<p class="kicker">Newsletter</p>
+<h1>{{ newsletter.title }}</h1>
+<p class="meta">Curated by <a href="{% url 'news:journalist_detail' newsletter.author.pk %}">{{ newsletter.author.get_full_name|default:newsletter.author.username }}</a> · {{ newsletter.created_at|date:"j F Y" }}</p>
+{% if newsletter.description %}<p class="article-body">{{ newsletter.description }}</p>{% endif %}
+{% if can_manage %}
+  <div class="actions">
+    <a class="button secondary" href="{% url 'news:newsletter_update' newsletter.pk %}">Edit</a>
+    {% if perms.news.delete_newsletter %}
+      <a class="button danger" href="{% url 'news:newsletter_delete' newsletter.pk %}">Delete</a>
+    {% endif %}
+  </div>
+{% endif %}
+<hr class="section-rule">
+{% for article in articles %}
+  {% include "news/_story.html" with article=article %}
+{% empty %}
+  <p class="empty">This newsletter has no published articles yet.</p>
+{% endfor %}
+{% endblock %}

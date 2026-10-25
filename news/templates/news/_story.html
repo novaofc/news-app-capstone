@@ -1,0 +1,9 @@
+<article class="story{% if lead %} lead-story{% endif %}">
+  <p class="kicker">{% if article.publisher %}{{ article.publisher.name }}{% else %}Independent{% endif %}</p>
+  <h3><a href="{{ article.get_absolute_url }}">{{ article.title }}</a></h3>
+  <p>{% if lead %}{{ article.content|truncatewords:70 }}{% else %}{{ article.content|truncatewords:35 }}{% endif %}</p>
+  <p class="meta">
+    By <a href="{% url 'news:journalist_detail' article.author.pk %}">{{ article.author.get_full_name|default:article.author.username }}</a>
+    · {{ article.created_at|date:"j M Y" }}
+  </p>
+</article>

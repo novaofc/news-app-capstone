@@ -1,0 +1,20 @@
+{% extends "news/base.html" %}
+{% block title %}{{ heading }} · The Daily Ledger{% endblock %}
+{% block content %}
+<h1>{{ heading }}</h1>
+<form class="form" method="post" novalidate>
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  <p>{{ form.title.label_tag }} {{ form.title }} {{ form.title.errors }}</p>
+  <p>{{ form.description.label_tag }} {{ form.description }} {{ form.description.errors }}</p>
+  <fieldset class="checkbox-list">
+    <legend><strong>Published articles to include</strong></legend>
+    {{ form.articles }}
+    {{ form.articles.errors }}
+  </fieldset>
+  <div class="actions">
+    <button class="button" type="submit">Save newsletter</button>
+    <a class="button secondary" href="{% url 'news:newsletter_list' %}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

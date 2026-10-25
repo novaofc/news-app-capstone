@@ -1,0 +1,30 @@
+{% extends "news/base.html" %}
+{% block title %}{{ publisher.name }} · The Daily Ledger{% endblock %}
+{% block content %}
+<div class="layout">
+  <section>
+    <p class="kicker">Publisher</p>
+    <h1>{{ publisher.name }}</h1>
+    <p>{{ publisher.description }}</p>
+        {% if perms.news.change_publisher %}
+      <div class="actions"><a class="button secondary" href="{% url 'news:publisher_update' publisher.pk %}">Edit publisher</a></div>
+    {% endif %}
+    {% include "news/_subscribe_button.html" with kind="publisher" target_pk=publisher.pk %}
+    <hr class="section-rule">
+    {% for article in page_obj %}
+      {% include "news/_story.html" with article=article %}
+    {% empty %}
+      <p class="empty">No published articles yet.</p>
+    {% endfor %}
+    {% include "news/_pagination.html" %}
+  </section>
+  <aside class="sidebar">
+    <h2>Editors</h2>
+    {% for editor in publisher.editors.all %}<p>{{ editor.get_full_name|default:editor.username }}</p>{% empty %}<p class="muted">None listed.</p>{% endfor %}
+    <h2>Journalists</h2>
+    {% for journalist in publisher.journalists.all %}
+      <p><a href="{% url 'news:journalist_detail' journalist.pk %}">{{ journalist.get_full_name|default:journalist.username }}</a></p>
+    {% empty %}<p class="muted">None listed.</p>{% endfor %}
+  </aside>
+</div>
+{% endblock %}

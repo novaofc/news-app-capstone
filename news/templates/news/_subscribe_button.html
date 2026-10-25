@@ -1,0 +1,13 @@
+{% if user.is_authenticated and user.is_reader %}
+  <form method="post" action="{% url 'news:toggle_subscription' kind target_pk %}">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    {% if is_subscribed %}
+      <button class="button secondary" type="submit">Unsubscribe</button>
+    {% else %}
+      <button class="button" type="submit">Subscribe</button>
+    {% endif %}
+  </form>
+{% elif not user.is_authenticated %}
+  <p class="meta"><a href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}">Log in as a reader</a> to subscribe.</p>
+{% endif %}

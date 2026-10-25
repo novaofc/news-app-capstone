@@ -1,0 +1,29 @@
+{% extends "news/base.html" %}
+{% block title %}{{ journalist.username }} · The Daily Ledger{% endblock %}
+{% block content %}
+<div class="layout">
+  <section>
+    <p class="kicker">Journalist</p>
+    <h1>{{ journalist.get_full_name|default:journalist.username }}</h1>
+    <p class="meta">@{{ journalist.username }}</p>
+    {% include "news/_subscribe_button.html" with kind="journalist" target_pk=journalist.pk %}
+    <hr class="section-rule">
+    {% for article in page_obj %}
+      {% include "news/_story.html" with article=article %}
+    {% empty %}
+      <p class="empty">No published articles yet.</p>
+    {% endfor %}
+    {% include "news/_pagination.html" %}
+  </section>
+  <aside class="sidebar">
+    <h2>Writes for</h2>
+    {% for publisher in journalist.publishers_joined.all %}
+      <p><a href="{{ publisher.get_absolute_url }}">{{ publisher.name }}</a></p>
+    {% empty %}<p class="muted">Independent</p>{% endfor %}
+    <h2>Newsletters</h2>
+    {% for newsletter in newsletters %}
+      <p><a href="{{ newsletter.get_absolute_url }}">{{ newsletter.title }}</a></p>
+    {% empty %}<p class="muted">None yet.</p>{% endfor %}
+  </aside>
+</div>
+{% endblock %}

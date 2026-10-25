@@ -1,0 +1,38 @@
+{% extends "news/base.html" %}
+{% block title %}{{ article.title }} · The Daily Ledger{% endblock %}
+{% block content %}
+<article>
+  <p class="kicker">
+    {% if article.publisher %}<a href="{{ article.publisher.get_absolute_url }}">{{ article.publisher.name }}</a>{% else %}Independent{% endif %}
+  </p>
+  <h1>{{ article.title }}</h1>
+  <p class="meta">
+    By <a href="{% url 'news:journalist_detail' article.author.pk %}">{{ article.author.get_full_name|default:article.author.username }}</a>
+    · {{ article.created_at|date:"j F Y, H:i" }}
+    {% if article.approved %}
+      · <span class="status published">Published</span>
+    {% else %}
+      · <span class="status pending">Awaiting approval</span>
+    {% endif %}
+  </p>
+  <hr class="section-rule">
+  <div class="article-body">{{ article.content|linebreaks }}</div>
+
+  {% if can_manage or can_approve %}
+    <div class="actions">
+      {% if can_approve %}
+        <form method="post" action="{% url 'news:approve_article' article.pk %}">
+          {% csrf_token %}
+          <button class="button" type="submit">Approve &amp; publish</button>
+        </form>
+      {% endif %}
+      {% if can_manage %}
+        <a class="button secondary" href="{% url 'news:article_update' article.pk %}">Edit</a>
+        {% if perms.news.delete_article %}
+          <a class="button danger" href="{% url 'news:article_delete' article.pk %}">Delete</a>
+        {% endif %}
+      {% endif %}
+    </div>
+  {% endif %}
+</article>
+{% endblock %}

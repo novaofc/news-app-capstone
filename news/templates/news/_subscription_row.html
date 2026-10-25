@@ -1,0 +1,9 @@
+<form method="post" action="{% url 'news:toggle_subscription' kind target.pk %}" style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin:0 0 10px">
+  {% csrf_token %}
+  <span>
+    {% if kind == "publisher" %}<a href="{{ target.get_absolute_url }}">{{ target.name }}</a>
+    {% else %}<a href="{% url 'news:journalist_detail' target.pk %}">{{ target.get_full_name|default:target.username }}</a>{% endif %}
+    <span class="meta">· {{ kind }}</span>
+  </span>
+  <button class="link-button" type="submit">{% if subscribed %}Unsubscribe{% else %}Subscribe{% endif %}</button>
+</form>

@@ -1,0 +1,41 @@
+{% extends "news/base.html" %}
+{% block title %}Review queue · The Daily Ledger{% endblock %}
+{% block content %}
+<h1>Review queue</h1>
+<p class="muted">Approving an article publishes it, emails its subscribers and logs it to <code>/api/approved/</code>.</p>
+
+{% if pending %}
+<table class="ledger">
+  <thead><tr><th>Article</th><th>Journalist</th><th>Publisher</th><th>Submitted</th><th>Action</th></tr></thead>
+  <tbody>
+  {% for article in pending %}
+    <tr>
+      <td><a href="{{ article.get_absolute_url }}">{{ article.title }}</a><br>
+        <span class="meta">{{ article.content|truncatewords:18 }}</span></td>
+      <td>{{ article.author.username }}</td>
+      <td>{{ article.publisher.name|default:"Independent" }}</td>
+      <td>{{ article.created_at|date:"j M, H:i" }}</td>
+      <td>
+        <form method="post" action="{% url 'news:approve_article' article.pk %}">
+          {% csrf_token %}
+          <button class="button" type="submit">Approve</button>
+        </form>
+        <p class="meta"><a href="{% url 'news:article_update' article.pk %}">Edit</a> ·
+          <a href="{% url 'news:article_delete' article.pk %}">Delete</a></p>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+  <p class="empty">The queue is clear. Nothing waiting for review.</p>
+{% endif %}
+
+<h2>Recently approved</h2>
+{% for article in recent %}
+  <p><a href="{{ article.get_absolute_url }}">{{ article.title }}</a>
+    <span class="meta">· approved by {{ article.approved_by.username|default:"—" }} on {{ article.approved_at|date:"j M Y" }}</span></p>
+{% empty %}
+  <p class="muted">No approved articles yet.</p>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,21 @@
+{% extends "news/base.html" %}
+{% block title %}Newsletters · The Daily Ledger{% endblock %}
+{% block content %}
+<h1>Newsletters</h1>
+<p class="muted">Collections of stories curated by our journalists.</p>
+{% if perms.news.add_newsletter %}
+  <div class="actions"><a class="button" href="{% url 'news:newsletter_create' %}">New newsletter</a></div>
+{% endif %}
+<div class="card-grid">
+  {% for newsletter in newsletters %}
+    <div class="card">
+      <p class="kicker">{{ newsletter.article_total }} article{{ newsletter.article_total|pluralize }}</p>
+      <h3><a href="{{ newsletter.get_absolute_url }}">{{ newsletter.title }}</a></h3>
+      <p>{{ newsletter.description|truncatewords:25 }}</p>
+      <p class="meta">By {{ newsletter.author.username }} · {{ newsletter.created_at|date:"j M Y" }}</p>
+    </div>
+  {% empty %}
+    <p class="empty">No newsletters yet.</p>
+  {% endfor %}
+</div>
+{% endblock %}
