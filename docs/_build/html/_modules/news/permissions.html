@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>news.permissions &#8212; News App 1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css?v=27fed22d" />
+    <script src="../../_static/documentation_options.js?v=f2a433a1"></script>
+    <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for news.permissions</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""</span>
+<span class="sd">REST API permission classes.</span>
+
+<span class="sd">Each class checks the Django model permissions that the user's role</span>
+<span class="sd">group grants (see roles.py), plus ownership rules for journalists.</span>
+<span class="sd">"""</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">hmac</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">django.conf</span><span class="w"> </span><span class="kn">import</span> <span class="n">settings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">rest_framework.permissions</span><span class="w"> </span><span class="kn">import</span> <span class="n">SAFE_METHODS</span><span class="p">,</span> <span class="n">BasePermission</span>
+
+<span class="c1"># HTTP method -&gt; model permission action</span>
+<span class="n">METHOD_ACTIONS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"POST"</span><span class="p">:</span> <span class="s2">"add"</span><span class="p">,</span>
+    <span class="s2">"PUT"</span><span class="p">:</span> <span class="s2">"change"</span><span class="p">,</span>
+    <span class="s2">"PATCH"</span><span class="p">:</span> <span class="s2">"change"</span><span class="p">,</span>
+    <span class="s2">"DELETE"</span><span class="p">:</span> <span class="s2">"delete"</span><span class="p">,</span>
+<span class="p">}</span>
+
+
+<div class="viewcode-block" id="has_model_perm">
+<a class="viewcode-back" href="../../modules.html#news.permissions.has_model_perm">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">has_model_perm</span><span class="p">(</span><span class="n">user</span><span class="p">,</span> <span class="n">action</span><span class="p">,</span> <span class="n">model_name</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""True if ``user`` has e.g. news.change_article."""</span>
+    <span class="k">return</span> <span class="n">user</span><span class="o">.</span><span class="n">has_perm</span><span class="p">(</span><span class="sa">f</span><span class="s2">"news.</span><span class="si">{</span><span class="n">action</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">model_name</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="RoleModelPermission">
+<a class="viewcode-back" href="../../modules.html#news.permissions.RoleModelPermission">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">RoleModelPermission</span><span class="p">(</span><span class="n">BasePermission</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Base class for Article and Newsletter permissions.</span>
+
+<span class="sd">    * Reading needs ``view_&lt;model&gt;`` (all roles have it).</span>
+<span class="sd">    * Writing needs the matching add/change/delete permission, so:</span>
+<span class="sd">      only journalists can create, editors and journalists can</span>
+<span class="sd">      update/delete, readers can only view.</span>
+<span class="sd">    * Journalists may only update/delete their own items; editors may</span>
+<span class="sd">      update/delete any.</span>
+<span class="sd">    """</span>
+
+    <span class="n">model_name</span> <span class="o">=</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="RoleModelPermission.has_permission">
+<a class="viewcode-back" href="../../modules.html#news.permissions.RoleModelPermission.has_permission">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">has_permission</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">request</span><span class="p">,</span> <span class="n">view</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Check the request against the user's model permissions.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            request: The incoming DRF request.</span>
+<span class="sd">            view: The view being accessed.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: ``True`` if the user is logged in and holds the</span>
+<span class="sd">            permission that matches the HTTP method, otherwise</span>
+<span class="sd">            ``False``.</span>
+<span class="sd">        """</span>
+        <span class="n">user</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">user</span> <span class="ow">and</span> <span class="n">user</span><span class="o">.</span><span class="n">is_authenticated</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">method</span> <span class="ow">in</span> <span class="n">SAFE_METHODS</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">has_model_perm</span><span class="p">(</span><span class="n">user</span><span class="p">,</span> <span class="s2">"view"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_name</span><span class="p">)</span>
+        <span class="n">action</span> <span class="o">=</span> <span class="n">METHOD_ACTIONS</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">request</span><span class="o">.</span><span class="n">method</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="n">action</span><span class="p">)</span> <span class="ow">and</span> <span class="n">has_model_perm</span><span class="p">(</span>
+            <span class="n">user</span><span class="p">,</span> <span class="n">action</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_name</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="RoleModelPermission.has_object_permission">
+<a class="viewcode-back" href="../../modules.html#news.permissions.RoleModelPermission.has_object_permission">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">has_object_permission</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">request</span><span class="p">,</span> <span class="n">view</span><span class="p">,</span> <span class="n">obj</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Apply ownership rules to a single article or newsletter.</span>
+
+<span class="sd">        Reads are always allowed here. Superusers and editors may</span>
+<span class="sd">        change any item; journalists may only change their own.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            request: The incoming DRF request.</span>
+<span class="sd">            view: The view being accessed.</span>
+<span class="sd">            obj: The article or newsletter being accessed.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: ``True`` if the user may act on ``obj``.</span>
+<span class="sd">        """</span>
+        <span class="n">user</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span>
+        <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">method</span> <span class="ow">in</span> <span class="n">SAFE_METHODS</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">if</span> <span class="n">user</span><span class="o">.</span><span class="n">is_superuser</span> <span class="ow">or</span> <span class="n">user</span><span class="o">.</span><span class="n">is_editor</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="n">obj</span><span class="o">.</span><span class="n">author_id</span> <span class="o">==</span> <span class="n">user</span><span class="o">.</span><span class="n">pk</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="ArticlePermission">
+<a class="viewcode-back" href="../../modules.html#news.permissions.ArticlePermission">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ArticlePermission</span><span class="p">(</span><span class="n">RoleModelPermission</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Role and ownership permissions for the Article API."""</span>
+
+    <span class="n">model_name</span> <span class="o">=</span> <span class="s2">"article"</span></div>
+
+
+
+<div class="viewcode-block" id="NewsletterPermission">
+<a class="viewcode-back" href="../../modules.html#news.permissions.NewsletterPermission">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">NewsletterPermission</span><span class="p">(</span><span class="n">RoleModelPermission</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Role and ownership permissions for the Newsletter API."""</span>
+
+    <span class="n">model_name</span> <span class="o">=</span> <span class="s2">"newsletter"</span></div>
+
+
+
+<div class="viewcode-block" id="CanApproveArticles">
+<a class="viewcode-back" href="../../modules.html#news.permissions.CanApproveArticles">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">CanApproveArticles</span><span class="p">(</span><span class="n">BasePermission</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Only users with news.approve_article (the Editor group)."""</span>
+
+    <span class="n">message</span> <span class="o">=</span> <span class="s2">"Only editors can approve articles."</span>
+
+<div class="viewcode-block" id="CanApproveArticles.has_permission">
+<a class="viewcode-back" href="../../modules.html#news.permissions.CanApproveArticles.has_permission">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">has_permission</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">request</span><span class="p">,</span> <span class="n">view</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Allow logged-in users who hold ``news.approve_article``.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: ``True`` if the user may approve articles.</span>
+<span class="sd">        """</span>
+        <span class="n">user</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span>
+        <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span>
+            <span class="n">user</span>
+            <span class="ow">and</span> <span class="n">user</span><span class="o">.</span><span class="n">is_authenticated</span>
+            <span class="ow">and</span> <span class="n">user</span><span class="o">.</span><span class="n">has_perm</span><span class="p">(</span><span class="s2">"news.approve_article"</span><span class="p">)</span>
+        <span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="IsReader">
+<a class="viewcode-back" href="../../modules.html#news.permissions.IsReader">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">IsReader</span><span class="p">(</span><span class="n">BasePermission</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Only users with the Reader role."""</span>
+
+    <span class="n">message</span> <span class="o">=</span> <span class="s2">"Only readers have subscriptions."</span>
+
+<div class="viewcode-block" id="IsReader.has_permission">
+<a class="viewcode-back" href="../../modules.html#news.permissions.IsReader.has_permission">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">has_permission</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">request</span><span class="p">,</span> <span class="n">view</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Allow logged-in users whose role is Reader.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: ``True`` if the user is an authenticated reader.</span>
+<span class="sd">        """</span>
+        <span class="n">user</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span>
+        <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="n">user</span> <span class="ow">and</span> <span class="n">user</span><span class="o">.</span><span class="n">is_authenticated</span> <span class="ow">and</span> <span class="n">user</span><span class="o">.</span><span class="n">is_reader</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="HasApprovedApiKey">
+<a class="viewcode-back" href="../../modules.html#news.permissions.HasApprovedApiKey">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">HasApprovedApiKey</span><span class="p">(</span><span class="n">BasePermission</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Allows the request if it carries the shared X-Api-Key header.</span>
+
+<span class="sd">    Used by POST /api/approved/ so that only this application's own</span>
+<span class="sd">    signal can write to the approval log.</span>
+<span class="sd">    """</span>
+
+    <span class="n">message</span> <span class="o">=</span> <span class="s2">"A valid X-Api-Key header is required."</span>
+
+<div class="viewcode-block" id="HasApprovedApiKey.has_permission">
+<a class="viewcode-back" href="../../modules.html#news.permissions.HasApprovedApiKey.has_permission">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">has_permission</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">request</span><span class="p">,</span> <span class="n">view</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Compare the ``X-Api-Key`` header with the configured key.</span>
+
+<span class="sd">        ``hmac.compare_digest`` is used so the comparison takes the</span>
+<span class="sd">        same time whether or not the key matches, which guards</span>
+<span class="sd">        against timing attacks.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: ``True`` if the supplied key matches</span>
+<span class="sd">            ``settings.APPROVED_API_KEY``.</span>
+<span class="sd">        """</span>
+        <span class="n">supplied</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"X-Api-Key"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">hmac</span><span class="o">.</span><span class="n">compare_digest</span><span class="p">(</span><span class="n">supplied</span><span class="p">,</span> <span class="n">settings</span><span class="o">.</span><span class="n">APPROVED_API_KEY</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">News App</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">Code reference</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, Lance Landore.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.2.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>
