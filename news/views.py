@@ -52,6 +52,16 @@ def get_visible_article(user, pk):
 
 
 def paginate(request, queryset):
+    """Return one page of ``queryset`` based on the ``?page=`` value.
+
+    Args:
+        request: The current HTTP request.
+        queryset: The items to split into pages.
+
+    Returns:
+        Page: The requested page. Invalid or missing page numbers
+        fall back to a valid page instead of raising an error.
+    """
     paginator = Paginator(queryset, ARTICLES_PER_PAGE)
     return paginator.get_page(request.GET.get("page"))
 
@@ -101,6 +111,12 @@ def signup(request):
 @login_required
 @permission_required("news.view_article", raise_exception=True)
 def article_detail(request, pk):
+    """Show a single article.
+
+    Unapproved articles are only visible to their author and to
+    editors. The template is told whether the user may edit or
+    approve the article so it can show the right buttons.
+    """
     article = get_visible_article(request.user, pk)
     context = {
         "article": article,
@@ -115,6 +131,11 @@ def article_detail(request, pk):
 @login_required
 @permission_required("news.add_article", raise_exception=True)
 def article_create(request):
+    """Let a journalist write a new article.
+
+    The article is saved as unapproved and waits in the review
+    queue until an editor approves it.
+    """
     form = ArticleForm(request.POST or None, author=request.user)
     if request.method == "POST" and form.is_valid():
         article = form.save()
@@ -132,6 +153,12 @@ def article_create(request):
 @login_required
 @permission_required("news.change_article", raise_exception=True)
 def article_update(request, pk):
+    """Edit an existing article.
+
+    Raises:
+        PermissionDenied: If a journalist tries to edit an article
+            they did not write.
+    """
     article = get_object_or_404(Article, pk=pk)
     if not can_manage(request.user, article):
         raise PermissionDenied("You can only edit your own articles.")
@@ -150,6 +177,15 @@ def article_update(request, pk):
 @login_required
 @permission_required("news.delete_article", raise_exception=True)
 def article_delete(request, pk):
+    """Confirm on GET, then delete the article on POST.
+
+    Editors are sent back to the review queue afterwards and
+    journalists to their own dashboard.
+
+    Raises:
+        PermissionDenied: If a journalist tries to delete an article
+            they did not write.
+    """
     article = get_object_or_404(Article, pk=pk)
     if not can_manage(request.user, article):
         raise PermissionDenied("You can only delete your own articles.")
@@ -225,6 +261,7 @@ def approve_article(request, pk):
 @login_required
 @permission_required("news.view_newsletter", raise_exception=True)
 def newsletter_list(request):
+    """List all newsletters with their author and article count."""
     newsletters = Newsletter.objects.select_related("author").annotate(
         article_total=Count("articles")
     )
@@ -236,6 +273,7 @@ def newsletter_list(request):
 @login_required
 @permission_required("news.view_newsletter", raise_exception=True)
 def newsletter_detail(request, pk):
+    """Show one newsletter and the approved articles it contains."""
     newsletter = get_object_or_404(
         Newsletter.objects.select_related("author"), pk=pk
     )
@@ -252,6 +290,7 @@ def newsletter_detail(request, pk):
 @login_required
 @permission_required("news.add_newsletter", raise_exception=True)
 def newsletter_create(request):
+    """Let a journalist create a new newsletter."""
     form = NewsletterForm(request.POST or None, author=request.user)
     if request.method == "POST" and form.is_valid():
         newsletter = form.save()
@@ -267,6 +306,12 @@ def newsletter_create(request):
 @login_required
 @permission_required("news.change_newsletter", raise_exception=True)
 def newsletter_update(request, pk):
+    """Edit an existing newsletter.
+
+    Raises:
+        PermissionDenied: If a journalist tries to edit a newsletter
+            they did not create.
+    """
     newsletter = get_object_or_404(Newsletter, pk=pk)
     if not can_manage(request.user, newsletter):
         raise PermissionDenied("You can only edit your own newsletters.")
@@ -285,6 +330,12 @@ def newsletter_update(request, pk):
 @login_required
 @permission_required("news.delete_newsletter", raise_exception=True)
 def newsletter_delete(request, pk):
+    """Confirm on GET, then delete the newsletter on POST.
+
+    Raises:
+        PermissionDenied: If a journalist tries to delete a newsletter
+            they did not create.
+    """
     newsletter = get_object_or_404(Newsletter, pk=pk)
     if not can_manage(request.user, newsletter):
         raise PermissionDenied("You can only delete your own newsletters.")
@@ -304,6 +355,7 @@ def newsletter_delete(request, pk):
 # Publishers, journalists and subscriptions
 # ---------------------------------------------------------------------
 def publisher_list(request):
+    """List all publishers with published-article and staff counts."""
     publishers = Publisher.objects.annotate(
         published=Count("articles", filter=Q(articles__approved=True)),
         staff=Count("journalists", distinct=True),
@@ -314,6 +366,10 @@ def publisher_list(request):
 
 
 def publisher_detail(request, pk):
+    """Show a publisher and a paginated list of its approved articles.
+
+    Readers also see whether they are subscribed to this publisher.
+    """
     publisher = get_object_or_404(Publisher, pk=pk)
     articles = publisher.articles.filter(approved=True).select_related(
         "author"
@@ -368,6 +424,12 @@ def publisher_update(request, pk):
 
 
 def journalist_detail(request, pk):
+    """Show a journalist's profile, approved articles and newsletters.
+
+    Only users with the Journalist role can be viewed here; any other
+    user ID returns a 404. Readers also see whether they are
+    subscribed to this journalist.
+    """
     journalist = get_object_or_404(
         CustomUser, pk=pk, role=roles.JOURNALIST
     )
@@ -396,6 +458,11 @@ def reader_required(view_func):
     @wraps(view_func)
     @login_required
     def wrapper(request, *args, **kwargs):
+        """Run the wrapped view only if the user is a reader.
+
+        Raises:
+            PermissionDenied: If the logged-in user is not a reader.
+        """
         if not request.user.is_reader:
             raise PermissionDenied("Only readers can manage subscriptions.")
         return view_func(request, *args, **kwargs)
