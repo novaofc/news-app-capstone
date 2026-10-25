@@ -1,0 +1,13 @@
+# Keep secrets, local environments and generated files out of the image.
+.env
+venv/
+.venv/
+.git/
+.gitignore
+__pycache__/
+*.py[cod]
+db.sqlite3
+staticfiles/
+docs/_build/
+.vscode/
+.DS_Store
