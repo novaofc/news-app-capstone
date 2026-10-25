@@ -39,6 +39,17 @@ class RoleModelPermission(BasePermission):
     model_name = None
 
     def has_permission(self, request, view):
+        """Check the request against the user's model permissions.
+
+        Args:
+            request: The incoming DRF request.
+            view: The view being accessed.
+
+        Returns:
+            bool: ``True`` if the user is logged in and holds the
+            permission that matches the HTTP method, otherwise
+            ``False``.
+        """
         user = request.user
         if not (user and user.is_authenticated):
             return False
@@ -50,6 +61,19 @@ class RoleModelPermission(BasePermission):
         )
 
     def has_object_permission(self, request, view, obj):
+        """Apply ownership rules to a single article or newsletter.
+
+        Reads are always allowed here. Superusers and editors may
+        change any item; journalists may only change their own.
+
+        Args:
+            request: The incoming DRF request.
+            view: The view being accessed.
+            obj: The article or newsletter being accessed.
+
+        Returns:
+            bool: ``True`` if the user may act on ``obj``.
+        """
         user = request.user
         if request.method in SAFE_METHODS:
             return True
@@ -59,10 +83,14 @@ class RoleModelPermission(BasePermission):
 
 
 class ArticlePermission(RoleModelPermission):
+    """Role and ownership permissions for the Article API."""
+
     model_name = "article"
 
 
 class NewsletterPermission(RoleModelPermission):
+    """Role and ownership permissions for the Newsletter API."""
+
     model_name = "newsletter"
 
 
@@ -72,6 +100,11 @@ class CanApproveArticles(BasePermission):
     message = "Only editors can approve articles."
 
     def has_permission(self, request, view):
+        """Allow logged-in users who hold ``news.approve_article``.
+
+        Returns:
+            bool: ``True`` if the user may approve articles.
+        """
         user = request.user
         return bool(
             user
@@ -86,6 +119,11 @@ class IsReader(BasePermission):
     message = "Only readers have subscriptions."
 
     def has_permission(self, request, view):
+        """Allow logged-in users whose role is Reader.
+
+        Returns:
+            bool: ``True`` if the user is an authenticated reader.
+        """
         user = request.user
         return bool(user and user.is_authenticated and user.is_reader)
 
@@ -101,5 +139,15 @@ class HasApprovedApiKey(BasePermission):
     message = "A valid X-Api-Key header is required."
 
     def has_permission(self, request, view):
+        """Compare the ``X-Api-Key`` header with the configured key.
+
+        ``hmac.compare_digest`` is used so the comparison takes the
+        same time whether or not the key matches, which guards
+        against timing attacks.
+
+        Returns:
+            bool: ``True`` if the supplied key matches
+            ``settings.APPROVED_API_KEY``.
+        """
         supplied = request.headers.get("X-Api-Key", "")
         return hmac.compare_digest(supplied, settings.APPROVED_API_KEY)
