@@ -139,3 +139,4 @@ GitHub.sublime-settings
 # Project extras
 staticfiles/
 .DS_Store
+.vscode/
